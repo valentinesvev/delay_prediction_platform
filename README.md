@@ -7,8 +7,8 @@
 
 - `backend/` — приложение FastAPI, endpoints и схемы HTTP-запросов.
 - `data/` — заготовки получения, валидации, хранения и удаления данных.
-- `ml/` — feature pipeline, интерфейс `Predictor` и `BaselinePredictor`.
-- `tests/` — автоматические проверки baseline и API.
+- `ml/` — feature pipeline и модель прогнозирования
+- `tests/` — автоматические проверки
 - `frontend/` — место для будущего интерфейса диспетчера.
 - `.github/workflows/` — место для будущих workflows автоматических тестов.
 
