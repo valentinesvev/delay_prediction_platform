@@ -1,52 +1,94 @@
 # Delay Prediction Platform
 
-!!!!
-Если кто-то ставит новую библиотеку (pip install), он сразу добавляет её в requirements.txt и коммитит это изменение.
-Все импортируемые библиотеки должны быть тоже добавлены в requirements.txt. Если нет - добавьте пожалуйста.
-Устанавливайте себе общее окружение
+## Работа с репозиторием и окружением
 
-Клонируйте себе репозиторий:
+> **Важно:** если вы устанавливаете новую внешнюю библиотеку через `pip install`, добавьте её в `requirements.txt` и закоммитьте это изменение вместе с кодом. Стандартные библиотеки Python (`os`, `json`, `sys` и т. п.) в `requirements.txt` добавлять не нужно.
 
+### Первый запуск
+
+#### 1. Клонируйте репозиторий
+
+```bash
 git clone https://github.com/valentinesvev/delay_prediction_platform.git
 cd delay_prediction_platform
+```
 
-Загрузите обновления, зайдите в свою ветеку: 
+#### 2. Перейдите в свою ветку
 
-git switch main
-git pull
+Если ветка уже создана для вас на GitHub:
 
-git switch feature/ *название вашей ветки*
-git merge main
-(Командой git branch проверьте где вы)
+```bash
+git fetch
+git switch --track origin/feature/НАЗВАНИЕ_ВЕТКИ
+```
 
-Установите окружение:
+Проверьте, в какой ветке вы находитесь:
 
+```bash
+git branch
+```
+
+Звёздочка `*` должна стоять напротив вашей ветки.
+
+#### 3. Создайте и активируйте виртуальное окружение
+
+```bash
 python3 -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
+```
 
-Для работы в Jupyter запустите это:
+### Работа в Jupyter
 
-pip install ipykernel 
-python -m ipykernel install --user --name delay-platform --display-name "Python (delay-platform)" 
-Jupyter lab
-(В окне Jupyter выберите окружение)
+Если вы используете Jupyter, один раз установите и зарегистрируйте kernel проекта:
 
-При повторном запуске:
+```bash
+pip install jupyter ipykernel
+python -m ipykernel install --user --name delay-platform --display-name "Python (delay-platform)"
+jupyter lab
+```
 
+В Jupyter выберите kernel **Python (delay-platform)**.
+
+### Последующие запуски
+
+Перед началом работы обновите `main`, затем подтяните его изменения в свою ветку:
+
+```bash
 cd delay_prediction_platform
 
 git switch main
 git pull
 
-git switch feature/ml
+git switch feature/НАЗВАНИЕ_ВЕТКИ
 git merge main
+```
 
+После этого активируйте окружение и запускайте Jupyter:
+
+```bash
 source .venv/bin/activate
 jupyter lab
+```
 
+Если после обновления изменился `requirements.txt`, дополнительно выполните:
 
+```bash
+pip install -r requirements.txt
+```
 
+### Как сохранять свою работу
+
+После законченного небольшого этапа:
+
+```bash
+git status
+git add .
+git commit -m "Коротко опишите, что сделано"
+git push
+```
+
+Не работайте напрямую в `main`: изменения из рабочих веток добавляем в `main` через Pull Request.
 
 ## Структура
 
@@ -56,7 +98,6 @@ jupyter lab
 - `tests/` — автоматические проверки
 - `frontend/` — место для будущего интерфейса диспетчера.
 - `.github/workflows/` — место для будущих workflows автоматических тестов.
-
 ## Запуск
 
 Используйте Python 3.9 или новее. Команды выполняются из корня проекта:
@@ -78,7 +119,6 @@ curl -X POST http://127.0.0.1:8000/predict \
 ```
 
 Ответ: `{"predicted_delay": 12.5}`.
-
 ## Baseline
 
 ```python
@@ -99,7 +139,6 @@ assert prediction == 12.5
 ```bash
 python -m pytest -q
 ```
-
 ## Конфигурация и локальные файлы
 
 Сейчас настройки окружения не требуются. `.env.example` содержит только
