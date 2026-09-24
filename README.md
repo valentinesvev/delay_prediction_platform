@@ -1,7 +1,52 @@
 # Delay Prediction Platform
 
-Минимальный Python-проект для ML-хакатона. Baseline прогнозирует будущую
-задержку как текущую задержку. Все задержки измеряются в минутах.
+!!!!
+Если кто-то ставит новую библиотеку (pip install), он сразу добавляет её в requirements.txt и коммитит это изменение.
+Все импортируемые библиотеки должны быть тоже добавлены в requirements.txt. Если нет - добавьте пожалуйста.
+Устанавливайте себе общее окружение
+
+Клонируйте себе репозиторий:
+
+git clone https://github.com/valentinesvev/delay_prediction_platform.git
+cd delay_prediction_platform
+
+Загрузите обновления, зайдите в свою ветеку: 
+
+git switch main
+git pull
+
+git switch feature/ *название вашей ветки*
+git merge main
+(Командой git branch проверьте где вы)
+
+Установите окружение:
+
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+
+Для работы в Jupyter запустите это:
+
+pip install ipykernel 
+python -m ipykernel install --user --name delay-platform --display-name "Python (delay-platform)" 
+Jupyter lab
+(В окне Jupyter выберите окружение)
+
+При повторном запуске:
+
+cd delay_prediction_platform
+
+git switch main
+git pull
+
+git switch feature/ml
+git merge main
+
+source .venv/bin/activate
+jupyter lab
+
+
+
 
 ## Структура
 
