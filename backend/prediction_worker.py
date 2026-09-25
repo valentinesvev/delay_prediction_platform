@@ -2,14 +2,12 @@
 import logging
 import os
 import time
-from backend.prediction import predict
+from ml.predictor import predict
+from ml.pipeline import generate_features
 from data.storage import database, directory, initialize_results
 
 
 logger = logging.getLogger(__name__)
-
-def generate_features(event):
-    return {'state': event['state'], 'delay': event['delay'], 'data_as_of': event['event_at']}
 
 
 def save_prediction(db, prediction, features, now):

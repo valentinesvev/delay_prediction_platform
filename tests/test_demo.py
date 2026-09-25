@@ -3,7 +3,7 @@ import pytest
 from fastapi.testclient import TestClient
 from backend.api import app
 from backend import prediction_worker as worker
-from backend import prediction
+from ml import predictor as prediction
 from data.storage import initialize_input, initialize_results, database, latest_prediction
 from data.ingestion import ingest_once
 
