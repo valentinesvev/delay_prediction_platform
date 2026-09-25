@@ -22,6 +22,7 @@ venv/
 # Local datasets and model artifacts
 data/raw/
 data/processed/
+data/local/
 artifacts/
 *.log
 
