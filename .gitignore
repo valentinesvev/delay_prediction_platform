@@ -31,3 +31,7 @@ node_modules/
 .idea/
 .vscode/
 .DS_Store
+
+# Emulator image is kept locally
+/data/dataset/ndtp-telemetry-emulator.tar
+/data/dataset/ndtp-telemetry-emulator.tar.gz

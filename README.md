@@ -73,6 +73,8 @@ git push -u origin HEAD
   - `predictor.py` содержит `predict(features)`, выбор модели и baseline;
   - `README.md` описывает интерфейсы и подключение моделей.
 - `data/` — работа с входными данными и базами:
+  - `dataset/` — датасет, разметка, описание задания и документация эмулятора;
+    инструкции — в [data/dataset/README.md](data/dataset/README.md);
   - `ingestion.py` запускает учебный генератор событий и очищает старые события;
   - `storage.py` создаёт таблицы и выполняет запросы SQLite;
   - `local/worker_demo/` содержит две локальные базы: `incoming.sqlite3`
