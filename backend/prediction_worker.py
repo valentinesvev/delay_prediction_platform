@@ -2,17 +2,19 @@
 import logging
 import os
 import time
+from backend.prediction import predict
 from data.storage import database, directory, initialize_results
 
+
+logger = logging.getLogger(__name__)
 
 def generate_features(event):
     return {'state': event['state'], 'delay': event['delay'], 'data_as_of': event['event_at']}
 
 
-def predict(db, features, now):
-    """Учебная модель сохраняет текущее состояние без преобразования."""
+def save_prediction(db, prediction, features, now):
     db.execute('INSERT INTO predictions(state, delay, data_as_of, predicted_at) VALUES (?, ?, ?, ?)',
-               (features['state'], features['delay'], features['data_as_of'], now))
+               (prediction['state'], prediction['delay'], features['data_as_of'], now))
 
 
 def cleanup_results(retention_seconds, now):
@@ -22,6 +24,11 @@ def cleanup_results(retention_seconds, now):
 
 
 def run_prediction_cycle(retention_seconds, input_retention_seconds, now=None):
+    started = time.perf_counter()
+    buses = 0
+    features_ms = predict_ms = 0.0
+    state = None
+    status = 'no_data'
     now = time.time() if now is None else now
     try:
         if not (directory() / 'incoming.sqlite3').exists():
@@ -32,14 +39,39 @@ def run_prediction_cycle(retention_seconds, input_retention_seconds, now=None):
             event = db.execute('SELECT * FROM validated_events WHERE event_at >= ? ORDER BY id DESC LIMIT 1', (now - input_retention_seconds,)).fetchone()
         if event is None:
             return None
-        features = generate_features(event)
+        buses = 1
+        phase_started = time.perf_counter()
+        try:
+            features = generate_features(event)
+        finally:
+            features_ms = (time.perf_counter() - phase_started) * 1000
+        phase_started = time.perf_counter()
+        try:
+            prediction = predict(features)
+        finally:
+            predict_ms = (time.perf_counter() - phase_started) * 1000
         with database('results.sqlite3') as db:
             db.execute('INSERT INTO features(state, delay, data_as_of, created_at) VALUES (?, ?, ?, ?)',
                        (features['state'], features['delay'], features['data_as_of'], now))
-            predict(db, features, now)
-        return features['state']
+            save_prediction(db, prediction, features, now)
+        state = prediction['state']
+        status = 'ok'
+        return state
+    except Exception:
+        status = 'error'
+        raise
     finally:
-        cleanup_results(retention_seconds, now)
+        try:
+            cleanup_results(retention_seconds, now)
+        except Exception:
+            status = 'error'
+            raise
+        finally:
+            logger.info(
+                'cycle status=%s buses=%d features_ms=%.3f predict_ms=%.3f total_ms=%.3f state=%s',
+                status, buses, features_ms, predict_ms,
+                (time.perf_counter() - started) * 1000, state,
+            )
 
 
 def main():
@@ -49,11 +81,11 @@ def main():
     if min(interval, retention, input_retention) <= 0:
         raise ValueError('Интервал и сроки хранения должны быть положительными')
     initialize_results()
-    logging.basicConfig(level=logging.INFO, format='prediction worker: %(message)s')
+    logging.basicConfig(level=logging.INFO, format='%(asctime)s prediction worker: %(message)s')
     while True:
         started = time.monotonic()
         try:
-            logging.info('state=%s', run_prediction_cycle(retention, input_retention))
+            run_prediction_cycle(retention, input_retention)
         except Exception:
             logging.exception('Ошибка расчёта; следующий цикл будет повторён')
         elapsed = time.monotonic() - started
