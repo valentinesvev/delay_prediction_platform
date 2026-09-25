@@ -52,17 +52,16 @@ pip install -r requirements.txt
 - `ml/` — обработка данных и прогнозирование:
   - `pipeline.py` подготавливает признаки через `generate_features(event)`;
   - `predictor.py` содержит `predict(features)`, выбор модели и baseline;
-  - `README.md` описывает интерфейсы и подключение моделей.
+  - `README.md`
 - `data/` — работа с входными данными и базами:
   - `dataset/` — датасет, разметка, описание задания и документация эмулятора;
-    инструкции — в [data/dataset/README.md](data/dataset/README.md);
   - `ingestion.py` запускает учебный генератор событий и очищает старые события;
   - `storage.py` создаёт таблицы и выполняет запросы SQLite;
   - `local/worker_demo/` содержит две локальные базы: `incoming.sqlite3`
     (события, расписание, счётчик) и `results.sqlite3` (признаки и прогнозы).
     Базы создаются автоматически и не попадают в Git.
-- `frontend/index.html` — интерфейс с текущим числом и кнопкой среднего последних 10 значений.
-- `scripts/run_demo.py` — совместный запуск и остановка трёх процессов на Linux, macOS и Windows.
+- `frontend/index.html` — интерфейс
+- `scripts/run_demo.py` — совместный запуск и остановка всех трёх процессов на Linux, macOS и Windows.
 - `tests/` — проверки HTTP API, хранения и взаимодействия генератора с worker.
 - `.github/workflows/tests.yml` — автоматическая проверка проекта в GitHub Actions.
 - `requirements.txt` — внешние Python-зависимости приложения и тестов.
