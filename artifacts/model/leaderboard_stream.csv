@@ -1,0 +1,12 @@
+model,cv_mae_real,holdout_mae,holdout_score_est,fit_sec
+ENSEMBLE(catboost+lightgbm+xgboost),51.22,52.25,1.0,
+catboost,51.52,51.94,1.0,76.7
+lightgbm,51.71,53.23,1.0,10.3
+sk_histgb,52.41,50.9,1.0,13.7
+xgboost,53.49,54.41,1.0,13.1
+catboost_mae,54.9,56.99,1.0,77.0
+extra_trees,59.91,61.2,1.0,16.4
+random_forest,61.18,62.56,1.0,54.9
+huber_linear,81.88,84.39,0.76,0.5
+baseline_zero,93.0,103.34,0.0,0.0
+baseline_cur_dev,117.35,130.95,0.0,0.0

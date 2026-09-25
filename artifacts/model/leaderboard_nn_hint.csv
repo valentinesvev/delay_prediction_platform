@@ -1,0 +1,6 @@
+model,cv_mae_real,holdout_mae,fit_sec
+gru_seq_only+pretrain,52.44,51.84,699.9
+gru+tab,50.44,47.62,713.9
+gru+tab+pretrain,44.97,42.69,711.7
+boosting_ensemble,46.21,45.81,
+BLEND boosting + gru+tab+pretrain (w_nn=0.6),41.91,40.6,
