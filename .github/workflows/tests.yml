@@ -23,6 +23,6 @@ jobs:
       - name: Check dependencies
         run: python -m pip check
       - name: Check launch script
-        run: bash -n scripts/run_demo.sh
+        run: python -m py_compile scripts/run_demo.py
       - name: Run tests
         run: python -m pytest -q

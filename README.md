@@ -11,14 +11,17 @@ git clone https://github.com/valentinesvev/delay_prediction_platform.git
 cd delay_prediction_platform
 ```
 
-#### 2. Перейдите в свою ветку
+#### 2. Создайте свою ветку
 
-Если ветка уже создана на GitHub:
+Обновите `main` и создайте от неё ветку командой `git switch -c`:
 
 ```bash
-git fetch
-git switch --track origin/feature/НАЗВАНИЕ_ВЕТКИ
+git switch main
+git pull --ff-only
+git switch -c feature/НАЗВАНИЕ_ВЕТКИ
 ```
+
+Замените `НАЗВАНИЕ_ВЕТКИ` на короткое название своей задачи.
 
 Проверьте, в какой ветке вы находитесь:
 
@@ -50,8 +53,11 @@ pip install -r requirements.txt
 git status
 git add .
 git commit -m "Коротко опишите, что сделано"
-git push
+git push -u origin HEAD
 ```
+
+При первой отправке `git push -u origin HEAD` создаст ветку на GitHub и настроит
+связь с локальной веткой. После этого достаточно `git push`.
 
 Не работайте напрямую в `main`: изменения из рабочих веток добавляем в `main` через Pull Request.
 
@@ -69,7 +75,7 @@ git push
     (события, расписание, счётчик) и `results.sqlite3` (признаки и прогнозы).
     Базы создаются автоматически и не попадают в Git.
 - `frontend/index.html` — интерфейс с текущим числом и кнопкой среднего последних 10 значений.
-- `scripts/run_demo.sh` — совместный запуск и остановка трёх процессов.
+- `scripts/run_demo.py` — совместный запуск и остановка трёх процессов на Linux, macOS и Windows.
 - `tests/` — проверки HTTP API, хранения и взаимодействия генератора с worker.
 - `.github/workflows/tests.yml` — автоматическая проверка проекта в GitHub Actions.
 - `requirements.txt` — внешние Python-зависимости приложения и тестов.
@@ -78,13 +84,22 @@ git push
 
 ## Запуск
 
-Для общего скрипта нужны Linux или WSL, Bash 4.3+ и Python 3.9+.
-Команды выполняются из корня репозитория:
+Нужен Python 3.9+. Команды выполняются из корня репозитория.
+
+Linux и macOS:
 
 ```bash
 python3 -m venv .venv
 .venv/bin/python -m pip install -r requirements.txt
-bash scripts/run_demo.sh
+.venv/bin/python scripts/run_demo.py
+```
+
+Windows (PowerShell или cmd):
+
+```powershell
+py -3 -m venv .venv
+.venv\Scripts\python.exe -m pip install -r requirements.txt
+.venv\Scripts\python.exe scripts/run_demo.py
 ```
 
 Откройте http://127.0.0.1:8000. На странице число — текущее состояние
@@ -92,7 +107,8 @@ bash scripts/run_demo.sh
 запрашивает у FastAPI среднее последних 10 сохранённых значений `state`
 через `GET /predictions/average` и показывает количество использованных записей. Остановить все три процесса: Ctrl+C
 в терминале запуска. Скрипт также останавливает остальные процессы, если один
-завершился. Если порт занят: `PORT=8001 bash scripts/run_demo.sh`.
+завершился. Если порт занят, добавьте к команде запуска `--port 8001`.
+Скрипт использует текущий интерпретатор Python и сам определяет корень проекта.
 
 ## Что происходит
 
@@ -122,7 +138,8 @@ bash scripts/run_demo.sh
 
 ## Отдельный запуск процессов
 
-В трёх терминалах из корня репозитория:
+В трёх терминалах из корня репозитория (Linux/macOS; на Windows замените
+`.venv/bin/python` на `.venv\Scripts\python.exe`):
 
 ```bash
 .venv/bin/python -m data.ingestion
@@ -145,7 +162,7 @@ cp .env.example .env
 set -a
 source .env
 set +a
-bash scripts/run_demo.sh
+.venv/bin/python scripts/run_demo.py
 ```
 
 ## Зависимости
@@ -161,7 +178,7 @@ bash scripts/run_demo.sh
 Workflow `.github/workflows/tests.yml` запускается на каждый `push` в любую
 ветку и на `pull_request`. В Ubuntu с Python 3.9 и 3.12 он устанавливает
 `requirements.txt`, проверяет совместимость установленных зависимостей
-через `pip check`, синтаксис скрипта запуска через `bash -n` и выполняет
+через `pip check`, синтаксис скрипта запуска через `python -m py_compile scripts/run_demo.py` и выполняет
 `python -m pytest -q`.
 
 Сейчас pytest выполняет 9 проверок (с учётом параметризованных случаев):
@@ -181,6 +198,6 @@ Workflow `.github/workflows/tests.yml` запускается на каждый 
 
 ```bash
 .venv/bin/python -m pip check
-bash -n scripts/run_demo.sh
+.venv/bin/python -m py_compile scripts/run_demo.py
 .venv/bin/python -m pytest -q
 ```
