@@ -1,0 +1,16 @@
+# ML-модуль: обучение и инференс (Python 3.12+)
+numpy>=2.0,<3
+pandas>=2.2,<4
+scikit-learn>=1.5,<2
+catboost==1.2.10
+lightgbm==4.7.0
+xgboost==3.2.0
+fastapi>=0.115,<1.0
+pydantic>=2.8,<3.0
+uvicorn>=0.30,<1.0
+# PyTorch: в Docker ставится CPU-сборка (см. Dockerfile.ml); для GPU — обычный pip install torch
+torch>=2.3
+onnx>=1.16
+# база: чтение телеметрии/плана и запись predictions
+sqlalchemy>=2.0
+psycopg2-binary>=2.9

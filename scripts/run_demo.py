@@ -1,4 +1,4 @@
-"""Запуск демо на Linux, macOS и Windows: python scripts/run_demo.py."""
+"""Запуск ML worker и FastAPI на одной базе: python scripts/run_demo.py."""
 import argparse
 import os
 from pathlib import Path
@@ -39,9 +39,10 @@ def main():
     if not 1 <= args.port <= 65535:
         parser.error('Порт должен быть от 1 до 65535')
 
+    if not os.getenv('DATABASE_URL'):
+        parser.error('Нужен DATABASE_URL: сначала создайте/заполните общую базу')
     commands = [
-        ['-m', 'data.ingestion'],
-        ['-m', 'backend.prediction_worker'],
+        ['-m', 'ml.worker'],
         ['-m', 'uvicorn', 'backend.api:app', '--host', '127.0.0.1',
          '--port', str(args.port)],
     ]

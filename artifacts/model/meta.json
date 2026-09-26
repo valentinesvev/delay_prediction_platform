@@ -1,0 +1,86 @@
+{
+  "features": [
+    "cur_dev_s",
+    "cur_dev_missing",
+    "last_plan_stop_age_s",
+    "align_dev_3m",
+    "align_dev_10m",
+    "align_dev_20m",
+    "align_cost_3m",
+    "align_cost_10m",
+    "align_sharp_10m",
+    "align_trend",
+    "align_minus_cur",
+    "det_n",
+    "det_last_dev",
+    "det_mean3_dev",
+    "det_slope",
+    "det_last_age_s",
+    "det_proj_dev",
+    "det_minus_cur",
+    "spd_mean_5m",
+    "spd_mean_10m",
+    "spd_moving_10m",
+    "stop_share_10m",
+    "cur_dwell_s",
+    "last_speed",
+    "gap_last_fix_s",
+    "n_fix_10m",
+    "valid_share_10m",
+    "dist_moved_5m",
+    "lead_s",
+    "n_stops_to_target",
+    "target_gap_prev_s",
+    "max_gap_ahead_s",
+    "plan_dist_to_target_m",
+    "plan_speed_ahead_kmh",
+    "req_time_at_cur_speed_s",
+    "slack_s",
+    "proj_dev_speed",
+    "target_manual",
+    "plan_dist_from_now_m",
+    "layover_ahead",
+    "layover_ahead_s",
+    "excess_plan_ahead_s",
+    "buffer_ahead_s",
+    "trip_elapsed_s",
+    "trip_stops_done",
+    "trip_remaining_s",
+    "target_after_layover",
+    "cur_dev_minus_buffer",
+    "hour"
+  ],
+  "ensemble": [
+    "catboost",
+    "lightgbm",
+    "xgboost"
+  ],
+  "modes": {
+    "hint": {
+      "n_train": 4787
+    },
+    "stream": {
+      "n_train": 4787
+    }
+  },
+  "nn": {
+    "hint": {
+      "files": [
+        "hint_nn_seed0.pt",
+        "hint_nn_seed1.pt",
+        "hint_nn_seed2.pt"
+      ],
+      "variant": "gru+tab+pretrain",
+      "w_nn": 0.6
+    },
+    "stream": {
+      "files": [
+        "stream_nn_seed0.pt",
+        "stream_nn_seed1.pt",
+        "stream_nn_seed2.pt"
+      ],
+      "variant": "gru+tab+pretrain",
+      "w_nn": 0.55
+    }
+  }
+}

@@ -23,7 +23,9 @@ venv/
 data/raw/
 data/processed/
 data/local/
-artifacts/
+artifacts/*
+# обученные модели (~20 МБ) коммитим — Docker ML-сервиса собирается без датасета
+!artifacts/model/
 *.log
 
 # Frontend and editors

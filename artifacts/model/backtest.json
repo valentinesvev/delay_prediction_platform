@@ -1,0 +1,52 @@
+{
+  "hint": {
+    "n_points": 353,
+    "w_nn": 0.6,
+    "mae_model": 40.6,
+    "mae_baseline_cur_dev": 93.36,
+    "mae_zero": 103.34,
+    "late_share": 0.244,
+    "late_auc_by_predicted_delay": 0.968,
+    "late_auc_baseline_cur_dev": 0.777,
+    "late_rule_pred_gt_120": {
+      "precision": 0.827,
+      "recall": 0.779
+    },
+    "late_rule_baseline_gt_120": {
+      "precision": 0.468,
+      "recall": 0.512
+    },
+    "interval_coverage_10_90": 0.768,
+    "lead_time_min": {
+      "min": 11.0,
+      "median": 11.0,
+      "max": 15.0
+    },
+    "forecasts_before_event_share": 1.0
+  },
+  "stream": {
+    "n_points": 353,
+    "w_nn": 0.55,
+    "mae_model": 44.33,
+    "mae_baseline_cur_dev": 93.36,
+    "mae_zero": 103.34,
+    "late_share": 0.244,
+    "late_auc_by_predicted_delay": 0.974,
+    "late_auc_baseline_cur_dev": 0.777,
+    "late_rule_pred_gt_120": {
+      "precision": 0.872,
+      "recall": 0.791
+    },
+    "late_rule_baseline_gt_120": {
+      "precision": 0.468,
+      "recall": 0.512
+    },
+    "interval_coverage_10_90": 0.785,
+    "lead_time_min": {
+      "min": 11.0,
+      "median": 11.0,
+      "max": 15.0
+    },
+    "forecasts_before_event_share": 1.0
+  }
+}
