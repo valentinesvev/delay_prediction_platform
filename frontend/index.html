@@ -2,61 +2,73 @@
 <html lang="ru">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Текущее состояние автобуса</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Транспорт на линии</title>
 <style>
-body { margin: 0; min-height: 100vh; display: grid; place-items: center; background: #f5f7fa; color: #172438; font-family: system-ui, sans-serif; }
-main { text-align: center; padding: 24px; max-width: 600px; }
-#state { display: block; font-size: clamp(80px, 20vw, 220px); font-weight: 600; }
-button { padding: 14px 20px; border: 0; border-radius: 10px; background: #245bcc; color: white; font: inherit; cursor: pointer; }
-button:disabled { opacity: .6; cursor: wait; }
-button:focus-visible { outline: 3px solid #172438; outline-offset: 4px; }
-p { color: #526077; line-height: 1.5; }
-#average { display: block; min-height: 3em; margin-top: 20px; font-size: 20px; }
+:root { color-scheme: light; font: 15px/1.5 system-ui,sans-serif; color:#203147; background:#f2f5f8; }
+body { max-width:1440px; margin:36px auto; padding:0 24px; }
+header { display:flex; justify-content:space-between; align-items:center; gap:16px; flex-wrap:wrap; }
+h1 { font-size:30px; margin:6px 0; } .eyebrow { color:#506985; letter-spacing:.1em; font-size:12px; font-weight:700; }
+.muted { color:#607187; } .badge { background:#e0ece7; color:#236143; padding:8px 14px; border-radius:20px; }
+.notice { background:#fff2ce; color:#755315; padding:12px 16px; border-radius:10px; }
+.metrics { display:flex; flex-wrap:wrap; gap:16px; margin:24px 0; }.metric { padding:16px 24px; background:white; border-radius:12px; min-width:160px; }.metric strong { display:block; font-size:28px; }
+.table-wrap { overflow:auto; background:white; border:1px solid #dee5ed; border-radius:12px; }
+table { border-collapse:collapse; width:100%; } th,td { padding:14px 16px; text-align:left; border-bottom:1px solid #e9edf2; } th { background:#eaf0f6; font-size:12px; text-transform:uppercase; letter-spacing:.03em; white-space:nowrap; } td { min-width:100px; vertical-align:top; } td small { display:block; color:#6c798c; margin-top:4px; } .late { color:#a54527; } .early { color:#27688b; }
+button { cursor:pointer; background:white; color:#203147; border:1px solid #c9d4e0; border-radius:8px; padding:9px 14px; font:inherit; } footer { margin-top:18px; font-size:13px; } #empty { padding:28px; text-align:center; }
+@media(max-width:600px) { body { padding:0 12px; margin:20px auto; } h1 { font-size:25px; } .metric { min-width:100px; flex:1; padding:12px; } }
 </style>
 </head>
 <body>
-<main>
-<output id="state" aria-label="Текущее состояние автобуса" aria-live="polite">—</output>
-<button id="average-button" type="button">Вывести среднее из последних 10</button>
-<p>По нажатию FastAPI вычислит среднее последних 10 сохранённых чисел.</p>
-<output id="average" aria-live="polite"></output>
-</main>
+<header><div><div class="eyebrow">ДИСПЕТЧЕРСКАЯ · МОСКВА</div><h1>Транспорт на линии</h1><div class="muted">Текущее движение и прогноз задержки через 10–15 минут</div></div><div><span id="mode" class="badge">Подключение…</span> <button id="refresh" type="button">Обновить</button></div></header>
+<p id="demo" class="notice" hidden>Демонстрация: искусственное расписание и случайное движение эмулятора. Прогнозы показывают работу системы, а не качество на реальном маршруте.</p>
+<p id="history" class="notice" hidden>Исторические данные. Список показан на момент последней телеметрии, а не на текущее время.</p>
+<div class="metrics"><div class="metric"><span class="muted">ТС на связи</span><strong id="count">—</strong></div><div class="metric"><span class="muted">На линии по плану</span><strong id="on-route">—</strong></div><div class="metric"><span class="muted">Свежих прогнозов</span><strong id="forecasts">—</strong></div></div>
+<p id="message" role="status" aria-live="polite">Получаем телеметрию…</p>
+<div class="table-wrap"><table aria-label="Транспорт на линии"><thead><tr><th>Транспорт</th><th>Состояние</th><th>Скорость</th><th>Задержка сейчас ≈</th><th>Остановка</th><th>Прогноз задержки</th><th>Остановка прогноза / прибытие</th><th>Связь</th></tr></thead><tbody id="vehicles"></tbody></table><div id="empty" hidden>Нет свежей телеметрии. Ожидаем подключение устройств.</div></div>
+<footer class="muted">Обновление каждые 5 секунд. На связи — точка не старше 2 минут. Время московское. Задержка сейчас — оценка по GPS и плану: «+» опоздание, «−» опережение. «—» означает, что данных недостаточно. Идентификатор ТС не является номером маршрута.</footer>
 <script>
-const output = document.querySelector('#state');
-const averageButton = document.querySelector('#average-button');
-const averageOutput = document.querySelector('#average');
-averageButton.addEventListener('click', async () => {
-  averageButton.disabled = true;
-  averageOutput.textContent = 'Запрос к FastAPI…';
-  try {
-    const response = await fetch('/predictions/average', { cache: 'no-store', signal: AbortSignal.timeout(5000) });
-    if (!response.ok) throw new Error('API недоступен');
-    const result = await response.json();
-    averageOutput.textContent = result.status === 'ready'
-      ? `Среднее: ${new Intl.NumberFormat('ru-RU', { maximumFractionDigits: 2 }).format(result.average)} · Записей: ${result.count} из 10`
-      : 'Пока нет данных для расчёта';
-  } catch {
-    averageOutput.textContent = 'Не удалось получить среднее. Попробуйте ещё раз.';
-  } finally {
-    averageButton.disabled = false;
-  }
-});
+const $ = id => document.getElementById(id);
+const time = value => value ? new Intl.DateTimeFormat('ru-RU',{hour:'2-digit',minute:'2-digit',second:'2-digit',timeZone:'Europe/Moscow'}).format(new Date(value)) : '—';
+const delay = value => value == null ? '—' : (value > 0 ? '+' : value < 0 ? '−' : '') + Math.abs(Math.round(value)) + ' с';
+const stop = value => value ? (value.name || 'ID ' + value.id) : '—';
+let loading = false;
 async function refresh() {
+  if (loading) return;
+  loading = true; $('refresh').disabled = true;
   try {
-    const response = await fetch('/predictions/latest', { cache: 'no-store', signal: AbortSignal.timeout(5000) });
-    if (!response.ok) throw new Error('API недоступен');
-    const result = await response.json();
-    output.textContent = result.status === 'ready' ? result.state : '—';
-    output.title = result.status === 'ready' ? `Рассчитано: ${result.predicted_at}` : 'Свежих данных нет';
+    const response = await fetch('/vehicles/active',{cache:'no-store',signal:AbortSignal.timeout(10000)});
+    if (!response.ok) throw new Error(response.status);
+    const data = await response.json();
+    $('mode').textContent = data.mode === 'live' ? 'Живой поток' : 'Исторический режим';
+    $('demo').hidden = !data.demo_plan; $('history').hidden = data.mode !== 'historical';
+    $('count').textContent = data.vehicles.length;
+    $('on-route').textContent = data.vehicles.filter(v=>v.status==='on_route').length;
+    $('forecasts').textContent = data.vehicles.filter(v=>v.prediction?.status==='ready').length;
+    $('vehicles').replaceChildren();
+    const states = {on_route:'На линии по плану',no_plan:'Нет плана',outside_schedule:'Вне времени плана',off_route:'Далеко от плана'};
+    for (const v of data.vehicles) {
+      const row = $('vehicles').insertRow();
+      const p = v.prediction;
+      const cells = [
+        ['ТС ' + v.tr_id,v.unit_id ? 'Устройство ' + v.unit_id : ''],
+        [states[v.status] || v.status,''],
+        [Math.round(v.speed_kmh) + ' км/ч',''],
+        [delay(v.current_delay_s),v.current_delay_s == null ? 'Недостаточно данных / нет подходящего плана' : 'Оценка по GPS'],
+        [stop(v.current_stop || v.next_stop),v.current_stop ? 'Рядом с остановкой (до 60 м)' : v.next_stop ? 'Следующая по плану' : 'Нет данных'],
+        [delay(p?.predicted_delay_s),p ? (p.status === 'stale' ? 'Устарел · ' : '') + p.model_used + (p.degraded ? ' · мало телеметрии' : '') : 'Ожидаем расчёт / нет цели через 10–15 мин'],
+        [p ? (p.target_stop_name || 'ID ' + p.target_stop_id) : '—',p ? 'Прибытие ' + time(p.predicted_arrival) : ''],
+        [time(v.event_time),'МСК']
+      ];
+      cells.forEach(([value,note],i)=>{const td=row.insertCell();td.textContent=value;if(note){const small=document.createElement('small');small.textContent=note;td.append(small);}if(i===3&&v.current_delay_s>0)td.className='late';if(i===3&&v.current_delay_s<0)td.className='early';});
+    }
+    $('empty').hidden = data.vehicles.length > 0;
+    $('message').textContent = 'Данные на ' + time(data.reference_time) + ' МСК · Обновлено ' + time(new Date().toISOString());
   } catch {
-    output.textContent = '—';
-    output.title = 'Нет соединения с API';
-  } finally {
-    setTimeout(refresh, 1000);
-  }
+    $('message').textContent = 'Нет связи с сервером. Последние показанные данные могут быть устаревшими; повторяем через 5 секунд.';
+    $('mode').textContent = 'Нет связи';
+  } finally { loading=false; $('refresh').disabled=false; }
 }
-refresh();
+$('refresh').addEventListener('click',refresh);refresh();setInterval(refresh,5000);
 </script>
 </body>
 </html>

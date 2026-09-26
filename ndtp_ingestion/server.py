@@ -1,137 +1,156 @@
+"""TCP-приёмник NDTP 6.2 для поставляемого эмулятора."""
 import asyncio
+import json
 import logging
+import os
 import struct
-import sqlite3
 import time
 from datetime import datetime, timezone
+from ndtp_ingestion.db_init import connect, init_db
 
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+log = logging.getLogger('ndtp')
+NPL = struct.Struct('<HHHHBIH')
+NPH = struct.Struct('<HHHI')
+NAV = struct.Struct('<IIIBBHHHHHBB')
 
-DB_NAME = 'transport_data.db'
 
-def save_telemetry_to_db(tr_id, event_time_sec, lon, lat, speed, location_valid):
-    """Сохраняет валидную точку в базу данных."""
-    try:
-        conn = sqlite3.connect(DB_NAME)
-        cursor = conn.cursor()
-        
-        # Конвертируем unix_timestamp в строку datetime UTC
-        event_time = datetime.fromtimestamp(event_time_sec, tz=timezone.utc).strftime('%Y-%m-%d %H:%M:%S')
-        receive_time = datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S')
-        
-        cursor.execute('''
-            INSERT OR IGNORE INTO telemetry 
-            (tr_id, event_time, receive_time, lon, lat, speed, location_valid)
-            VALUES (?, ?, ?, ?, ?, ?, ?)
-        ''', (tr_id, event_time, receive_time, lon, lat, speed, location_valid))
-        
-        conn.commit()
-        conn.close()
-    except Exception as e:
-        logging.error(f"Ошибка записи в БД: {e}")
+def stamp(seconds):
+    return datetime.fromtimestamp(seconds, timezone.utc).strftime('%Y-%m-%d %H:%M:%S.%f')
+
+
+def crc16(data):
+    crc = 0xffff
+    for byte in data:
+        crc ^= byte
+        for _ in range(8):
+            crc = (crc >> 1) ^ (0xa001 if crc & 1 else 0)
+    return ((crc & 255) << 8) | (crc >> 8)
+
+
+def decode(header, payload, unit_map, now=None):
+    now = time.time() if now is None else now
+    sig, size, flags, crc, kind, unit, _ = NPL.unpack(header)
+    if sig != 0x7e7e or kind != 2 or flags != 0 or size != len(payload) or size < NPH.size:
+        raise ValueError('Некорректный NPL')
+    if crc16(payload) != crc:
+        raise ValueError('Ошибка CRC')
+    service, kind, _, _ = NPH.unpack_from(payload)
+    body = payload[NPH.size:]
+    if kind == 100 and service == 0:
+        if len(body) != 18:
+            raise ValueError('Некорректный handshake')
+        major, minor, _, peer, _, _ = struct.unpack('<HHHIII', body)
+        if (major, minor, peer) != (6, 2, unit):
+            raise ValueError('Некорректная версия/устройство handshake')
+        return None
+    if service != 1 or kind != 101 or len(body) < 28 or body[0] != 0:
+        raise ValueError('Нет первой навигационной ячейки')
+    if str(unit) not in unit_map:
+        raise ValueError(f'Нет соответствия unit_id={unit} → tr_id')
+    timestamp, lon, lat, navflags, _, speed, *_ = NAV.unpack_from(body, 2)
+    lon = lon / 1e7 * (1 if navflags & 0x40 else -1)
+    lat = lat / 1e7 * (1 if navflags & 0x20 else -1)
+    if not navflags & 0x80 or not (36.5 < lon < 38.5 and 55 < lat < 56.5) or speed > 120:
+        raise ValueError('Невалидные координаты/скорость (область модели — Москва)')
+    if not now - 7200 <= timestamp <= now + 60:
+        raise ValueError('Время точки вне допустимого окна: -2 часа … +60 секунд')
+    return (int(unit_map[str(unit)]), unit, stamp(timestamp), stamp(now), lon, lat, speed, True)
+
+
+def save_point(point):
+    with connect() as conn:
+        result = conn.execute('''INSERT INTO telemetry
+            (tr_id, unit_id, event_time, receive_time, lon, lat, speed, location_valid)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?) ON CONFLICT(tr_id, event_time) DO NOTHING''', point)
+        return result.rowcount
+
+
+def retentions():
+    telemetry_s = float(os.getenv('TELEMETRY_RETENTION_S', '7200'))
+    schedule_s = float(os.getenv('SCHEDULE_RETENTION_S', '21600'))
+    predictions_s = float(os.getenv('PREDICTIONS_RETENTION_S', '86400'))
+    if telemetry_s < float(os.getenv('ML_WINDOW_S', '2700')) + 60 or schedule_s < 21600 or predictions_s <= 0:
+        raise ValueError('Сроки хранения слишком малы для ML')
+    return telemetry_s, schedule_s, predictions_s
+
+
+def cleanup(now=None):
+    now = time.time() if now is None else now
+    telemetry_s, schedule_s, predictions_s = retentions()
+    result = {}
+    with connect() as conn:
+        for table, field, age in [('telemetry', 'receive_time', telemetry_s),
+                                  ('schedule_plan', 'time_begin', schedule_s),
+                                  ('predictions', 'predicted_at', predictions_s)]:
+            result[table] = conn.execute(f'DELETE FROM {table} WHERE {field} < ?', (stamp(now - age),)).rowcount
+    return result
+
 
 async def garbage_collector():
-    """Фоновый процесс: удаляет старые данные из базы (храним только последние 2 часа телеметрии)."""
+    interval = float(os.getenv('CLEANUP_INTERVAL_S', '600'))
+    if interval <= 0:
+        raise ValueError('CLEANUP_INTERVAL_S должен быть положительным')
     while True:
         try:
-            conn = sqlite3.connect(DB_NAME)
-            cursor = conn.cursor()
-            
-            # Удаляем телеметрию старше 2 часов от текущего времени получения
-            cursor.execute("DELETE FROM telemetry WHERE receive_time < datetime('now', '-2 hours')")
-            deleted = cursor.rowcount
-            if deleted > 0:
-                logging.info(f"Сборщик мусора: удалено {deleted} старых записей телеметрии.")
-            
-            conn.commit()
-            conn.close()
-        except Exception as e:
-            logging.error(f"Ошибка сборщика мусора: {e}")
-        
-        await asyncio.sleep(600) # Запускаем каждые 10 минут
+            log.info('Очистка: %s', await asyncio.to_thread(cleanup))
+        except Exception:
+            log.exception('Ошибка очистки')
+        await asyncio.sleep(interval)
 
-async def handle_client(reader, writer):
-    addr = writer.get_extra_info('peername')
-    logging.info(f"Подключен эмулятор: {addr}")
-    
+
+async def handle_client(reader, writer, unit_map):
+    peer = writer.get_extra_info('peername')
+    log.info('Подключение %s', peer)
     try:
         while True:
-            # Читаем NPL (15 байт)
-            npl_data = await reader.readexactly(15)
-            # Распаковка NPL: signature(H), dataSize(H), flags(H), crc(H), type(B), peerAddress(I), requestId(H)
-            npl = struct.unpack('<H H H H B I H', npl_data)
-            
-            if npl[0] != 0x7E7E: # Проверка сигнатуры
-                logging.warning("Неверная сигнатура пакета. Отключаем.")
-                break
-                
-            unit_id = npl[5]
-            data_size = npl[1]
-            
-            # Читаем NPH и тело пакета
-            payload_data = await reader.readexactly(data_size)
-            
-            # Распаковка NPH (10 байт): serviceId(H), type(H), flags(H), requestId(I)
-            nph = struct.unpack('<H H H I', payload_data[:10])
-            nph_type = nph[1]
-            
-            body = payload_data[10:]
-            
-            if nph_type == 100:
-                logging.info(f"[{unit_id}] Получен Handshake (CONN_REQUEST).")
-                # В ответ ничего слать не нужно по спецификации эмулятора
-            
-            elif nph_type == 101:
-                # Realtime пакет, парсим ячейки
-                offset = 0
-                while offset < len(body):
-                    cell_type = body[offset]
-                    cell_num = body[offset+1]
-                    offset += 2
-                    
-                    if cell_type == 0: # G6CellNav00 (26 байт)
-                        cell_data = body[offset:offset+26]
-                        if len(cell_data) == 26:
-                            nav = struct.unpack('<I I I B B H H H H H B B', cell_data)
-                            
-                            timestamp = nav[0]
-                            lon_raw = nav[1]
-                            lat_raw = nav[2]
-                            flags = nav[3]
-                            speed = nav[5]
-                            
-                            # Математика из документации:
-                            lon = lon_raw / 10000000.0
-                            lat = lat_raw / 10000000.0
-                            valid = bool(flags & 0x80) # extraDopBit7 (валидность)
-                            
-                            if valid and lon > 0 and lat > 0:
-                                logging.info(f"[{unit_id}] Телеметрия: {lat:.6f}, {lon:.6f} | {speed} км/ч")
-                                save_telemetry_to_db(unit_id, timestamp, lon, lat, speed, valid)
-                        offset += 26
-                    else:
-                        # Пропускаем неизвестные ячейки (нам нужна только навигация)
-                        break 
-                        
-    except asyncio.IncompleteReadError:
-        logging.info(f"Отключение эмулятора: {addr}")
-    except Exception as e:
-        logging.error(f"Ошибка соединения {addr}: {e}")
+            header = await reader.readexactly(NPL.size)
+            sig, size, *_ = NPL.unpack(header)
+            if sig != 0x7e7e or size < NPH.size:
+                raise ValueError('Некорректная граница пакета')
+            payload = await reader.readexactly(size)
+            try:
+                point = decode(header, payload, unit_map)
+                if point:
+                    written = await asyncio.to_thread(save_point, point)
+                    log.debug('ТС %s: %s', point[0], 'записано' if written else 'дубль')
+            except ValueError as exc:
+                log.warning('Пакет отклонён: %s', exc)
+    except (asyncio.IncompleteReadError, ConnectionError):
+        pass
+    except Exception:
+        log.exception('Ошибка соединения %s', peer)
     finally:
         writer.close()
-        await writer.wait_closed()
+        try:
+            await writer.wait_closed()
+        except ConnectionError:
+            pass
+
 
 async def main():
-    # Запускаем фоновый сборщик мусора
-    asyncio.create_task(garbage_collector())
-    
-    server = await asyncio.start_server(handle_client, '0.0.0.0', 9000)
-    logging.info("TCP-сервер (NDTP Ingestion) запущен. Ожидание эмулятора...")
-    async with server:
-        await server.serve_forever()
+    init_db()
+    with open(os.environ['NDTP_UNIT_MAP'], encoding='utf-8') as source:
+        unit_map = json.load(source)
+    if not unit_map or any(int(k) < 0 or int(v) <= 0 for k, v in unit_map.items()):
+        raise ValueError('Нужен непустой JSON unit_id → tr_id')
+    retentions()
+    if float(os.getenv('CLEANUP_INTERVAL_S', '600')) <= 0:
+        raise ValueError('CLEANUP_INTERVAL_S должен быть положительным')
+    collector = asyncio.create_task(garbage_collector())
+    server = await asyncio.start_server(lambda r, w: handle_client(r, w, unit_map),
+                                      os.getenv('NDTP_HOST', '0.0.0.0'), int(os.getenv('NDTP_PORT', '9000')))
+    log.info('NDTP слушает %s; устройств в карте: %s', server.sockets[0].getsockname(), len(unit_map))
+    try:
+        async with server:
+            await server.serve_forever()
+    finally:
+        collector.cancel()
+        await asyncio.gather(collector, return_exceptions=True)
+
 
 if __name__ == '__main__':
+    logging.basicConfig(level=logging.INFO, format='%(asctime)s %(levelname)s %(name)s: %(message)s')
     try:
         asyncio.run(main())
     except KeyboardInterrupt:
-        logging.info("Сервер остановлен.")
+        pass

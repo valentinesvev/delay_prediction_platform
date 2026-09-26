@@ -23,7 +23,9 @@ venv/
 data/raw/
 data/processed/
 data/local/
-artifacts/
+artifacts/*
+# обученные модели (~20 МБ) коммитим — Docker ML-сервиса собирается без датасета
+!artifacts/model/
 *.log
 
 # Frontend and editors
@@ -35,3 +37,4 @@ node_modules/
 # Emulator image is kept locally
 /data/dataset/ndtp-telemetry-emulator.tar
 /data/dataset/ndtp-telemetry-emulator.tar.gz
+.venv-python39/

@@ -1,17 +1,8 @@
-# Используем официальный легкий образ Python
+# Сборка из корня: docker build -f ndtp_ingestion/Dockerfile -t ndtp-server .
 FROM python:3.12-slim
-
-# Устанавливаем рабочую директорию внутри контейнера
 WORKDIR /app
-
-# Копируем наши скрипты и файл расписания
-COPY server.py .
-COPY db_init.py .
-COPY load_schedule.py .
-COPY schedule.csv .
-
-# Открываем порт 9000 для эмулятора
+RUN pip install --no-cache-dir 'numpy>=2,<3' 'pandas>=2.2,<4' 'sqlalchemy>=2,<3'
+COPY ml/ ml/
+COPY ndtp_ingestion/ ndtp_ingestion/
 EXPOSE 9000
-
-# При старте контейнера: создаем БД -> грузим расписание -> запускаем сервер
-CMD ["sh", "-c", "python3 db_init.py && python3 load_schedule.py && python3 server.py"]
+CMD ["python", "-m", "ndtp_ingestion.server"]

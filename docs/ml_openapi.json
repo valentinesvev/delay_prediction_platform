@@ -1,0 +1,611 @@
+{
+ "openapi": "3.1.0",
+ "info": {
+  "title": "Delay Prediction — ML service",
+  "description": "Регрессия: прогноз задержки ТС (сек) на первой остановке в окне T+10…15 мин. Ансамбль CatBoost + LightGBM + XGBoost + PyTorch GRU; при сбое — бейзлайн «прогноз = текущая задержка». Источник данных: запрос (`/predict*`) или база (`/predict/from-db`, фоновый воркер `python -m ml.worker`).",
+  "version": "1.0.0"
+ },
+ "paths": {
+  "/health": {
+   "get": {
+    "summary": "Health",
+    "operationId": "health_health_get",
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "additionalProperties": true,
+         "type": "object",
+         "title": "Response Health Health Get"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/model/info": {
+   "get": {
+    "summary": "Model Info",
+    "description": "Версия модели, признаки, метрики лидерборда.",
+    "operationId": "model_info_model_info_get",
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "additionalProperties": true,
+         "type": "object",
+         "title": "Response Model Info Model Info Get"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/predict": {
+   "post": {
+    "summary": "Predict",
+    "description": "Прогноз для одного ТС.",
+    "operationId": "predict_predict_post",
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/VehicleState"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/PredictionOut"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/predict/batch": {
+   "post": {
+    "summary": "Predict Batch",
+    "description": "Прогноз для всего парка за один вызов; ТС без цели в окне попадают в ``skipped``.",
+    "operationId": "predict_batch_predict_batch_post",
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "items": {
+         "$ref": "#/components/schemas/VehicleState"
+        },
+        "type": "array",
+        "title": "States"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/BatchOut"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/predict/from-db": {
+   "post": {
+    "summary": "Predict From Db",
+    "description": "Один цикл по базе: прочитать телеметрию и план → прогноз по всем ТС → записать в ``predictions``.\n\nТо же, что делает фоновый воркер ``python -m ml.worker``; удобно для проверки из Swagger.\n``T`` по умолчанию — последняя точка телеметрии в базе.",
+    "operationId": "predict_from_db_predict_from_db_post",
+    "parameters": [
+     {
+      "name": "write",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "type": "boolean",
+       "default": true,
+       "title": "Write"
+      }
+     },
+     {
+      "name": "T",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "number"
+        },
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "T"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/DBCycleOut"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  }
+ },
+ "components": {
+  "schemas": {
+   "BatchOut": {
+    "properties": {
+     "predictions": {
+      "items": {
+       "$ref": "#/components/schemas/PredictionOut"
+      },
+      "type": "array",
+      "title": "Predictions"
+     },
+     "skipped": {
+      "items": {
+       "$ref": "#/components/schemas/SkippedOut"
+      },
+      "type": "array",
+      "title": "Skipped"
+     },
+     "total_ms": {
+      "type": "number",
+      "title": "Total Ms"
+     }
+    },
+    "type": "object",
+    "required": [
+     "predictions",
+     "skipped",
+     "total_ms"
+    ],
+    "title": "BatchOut"
+   },
+   "DBCycleOut": {
+    "properties": {
+     "T": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "T",
+      "description": "момент потока, на который сделан прогноз"
+     },
+     "written": {
+      "type": "integer",
+      "title": "Written"
+     },
+     "predictions": {
+      "items": {
+       "$ref": "#/components/schemas/PredictionOut"
+      },
+      "type": "array",
+      "title": "Predictions"
+     },
+     "skipped": {
+      "items": {
+       "$ref": "#/components/schemas/SkippedOut"
+      },
+      "type": "array",
+      "title": "Skipped"
+     },
+     "timing_ms": {
+      "additionalProperties": true,
+      "type": "object",
+      "title": "Timing Ms"
+     }
+    },
+    "type": "object",
+    "required": [
+     "written",
+     "predictions",
+     "skipped",
+     "timing_ms"
+    ],
+    "title": "DBCycleOut"
+   },
+   "HTTPValidationError": {
+    "properties": {
+     "detail": {
+      "items": {
+       "$ref": "#/components/schemas/ValidationError"
+      },
+      "type": "array",
+      "title": "Detail"
+     }
+    },
+    "type": "object",
+    "title": "HTTPValidationError"
+   },
+   "PlanStop": {
+    "properties": {
+     "stop_id": {
+      "type": "integer",
+      "title": "Stop Id",
+      "description": "tt_action_item_id"
+     },
+     "time_begin": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "string"
+       }
+      ],
+      "title": "Time Begin",
+      "description": "плановое прибытие (unix-сек или ISO)"
+     },
+     "lon": {
+      "type": "number",
+      "title": "Lon"
+     },
+     "lat": {
+      "type": "number",
+      "title": "Lat"
+     },
+     "manual_fill": {
+      "type": "boolean",
+      "title": "Manual Fill",
+      "default": false
+     }
+    },
+    "type": "object",
+    "required": [
+     "stop_id",
+     "time_begin",
+     "lon",
+     "lat"
+    ],
+    "title": "PlanStop",
+    "description": "Плановая остановка из расписания (``schedule_plan.csv``)."
+   },
+   "PredictionOut": {
+    "properties": {
+     "tr_id": {
+      "type": "integer",
+      "title": "Tr Id"
+     },
+     "T": {
+      "type": "number",
+      "title": "T"
+     },
+     "target_stop_id": {
+      "type": "integer",
+      "title": "Target Stop Id"
+     },
+     "target_time_plan": {
+      "type": "number",
+      "title": "Target Time Plan"
+     },
+     "predicted_arrival": {
+      "type": "number",
+      "title": "Predicted Arrival"
+     },
+     "predicted_delay_s": {
+      "type": "number",
+      "title": "Predicted Delay S"
+     },
+     "interval_s": {
+      "prefixItems": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "number"
+       }
+      ],
+      "type": "array",
+      "maxItems": 2,
+      "minItems": 2,
+      "title": "Interval S",
+      "description": "интервал прогноза задержки 10–90%, сек"
+     },
+     "mode": {
+      "type": "string",
+      "title": "Mode",
+      "description": "hint — с cur_dev_s, stream — только телеметрия"
+     },
+     "degraded": {
+      "type": "boolean",
+      "title": "Degraded",
+      "description": "нет свежей телеметрии: прогноз по последнему состоянию"
+     },
+     "inference_ms": {
+      "type": "number",
+      "title": "Inference Ms"
+     },
+     "model_used": {
+      "type": "string",
+      "title": "Model Used",
+      "description": "ensemble | boosting | catboost | torch | baseline"
+     },
+     "fallback_reason": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Fallback Reason",
+      "description": "почему ответил бейзлайн (если ответил)"
+     },
+     "predicted_at": {
+      "type": "number",
+      "title": "Predicted At",
+      "description": "когда сделан прогноз, unix-сек (время сервера)"
+     }
+    },
+    "type": "object",
+    "required": [
+     "tr_id",
+     "T",
+     "target_stop_id",
+     "target_time_plan",
+     "predicted_arrival",
+     "predicted_delay_s",
+     "interval_s",
+     "mode",
+     "degraded",
+     "inference_ms",
+     "model_used",
+     "predicted_at"
+    ],
+    "title": "PredictionOut"
+   },
+   "SkippedOut": {
+    "properties": {
+     "tr_id": {
+      "type": "integer",
+      "title": "Tr Id"
+     },
+     "reason": {
+      "type": "string",
+      "title": "Reason"
+     }
+    },
+    "type": "object",
+    "required": [
+     "tr_id",
+     "reason"
+    ],
+    "title": "SkippedOut"
+   },
+   "TelemetryPoint": {
+    "properties": {
+     "t": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "string"
+       }
+      ],
+      "title": "T",
+      "description": "event_time (unix-сек или ISO)"
+     },
+     "lon": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Lon"
+     },
+     "lat": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Lat"
+     },
+     "speed": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Speed",
+      "description": "км/ч"
+     },
+     "valid": {
+      "type": "boolean",
+      "title": "Valid",
+      "default": true
+     }
+    },
+    "type": "object",
+    "required": [
+     "t"
+    ],
+    "title": "TelemetryPoint",
+    "description": "Навигационная точка (ячейка NDTP G6CellNav00 после декодирования)."
+   },
+   "ValidationError": {
+    "properties": {
+     "loc": {
+      "items": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "integer"
+        }
+       ]
+      },
+      "type": "array",
+      "title": "Location"
+     },
+     "msg": {
+      "type": "string",
+      "title": "Message"
+     },
+     "type": {
+      "type": "string",
+      "title": "Error Type"
+     },
+     "input": {
+      "title": "Input"
+     },
+     "ctx": {
+      "type": "object",
+      "title": "Context"
+     }
+    },
+    "type": "object",
+    "required": [
+     "loc",
+     "msg",
+     "type"
+    ],
+    "title": "ValidationError"
+   },
+   "VehicleState": {
+    "properties": {
+     "tr_id": {
+      "type": "integer",
+      "title": "Tr Id"
+     },
+     "T": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "string"
+       }
+      ],
+      "title": "T",
+      "description": "момент прогноза; телеметрия после T игнорируется"
+     },
+     "cur_dev_s": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Cur Dev S",
+      "description": "задержка на последней пройденной остановке, если известна"
+     },
+     "target_stop_id": {
+      "anyOf": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Target Stop Id",
+      "description": "если не задан — первая остановка в окне T+10…15 мин"
+     },
+     "plan": {
+      "items": {
+       "$ref": "#/components/schemas/PlanStop"
+      },
+      "type": "array",
+      "title": "Plan",
+      "description": "план ТС на весь день (или минимум с начала текущего рейса до T+30 мин)"
+     },
+     "telemetry": {
+      "items": {
+       "$ref": "#/components/schemas/TelemetryPoint"
+      },
+      "type": "array",
+      "title": "Telemetry",
+      "description": "окно телеметрии, последние 30 минут до T"
+     }
+    },
+    "type": "object",
+    "required": [
+     "tr_id",
+     "T",
+     "plan"
+    ],
+    "title": "VehicleState",
+    "description": "Состояние ТС на момент прогноза ``T``."
+   }
+  }
+ }
+}

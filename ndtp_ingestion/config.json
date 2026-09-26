@@ -1,5 +1,5 @@
 {
-  "targetHost": "host.docker.internal",
+  "targetHost": "127.0.0.1",
   "targetPort": 9000,
   "units": [
     {

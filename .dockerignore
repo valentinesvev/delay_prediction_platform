@@ -1,0 +1,6 @@
+.git
+**/__pycache__
+.pytest_cache
+artifacts/features
+*.csv
+!artifacts/model/*.csv
