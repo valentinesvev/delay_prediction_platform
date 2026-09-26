@@ -1,0 +1,18 @@
+{
+  "targetHost": "127.0.0.1",
+  "targetPort": 9000,
+  "units": [
+    {
+      "unitId": 1166336,
+      "intervalMs": 1000,
+      "autoGenerate": true,
+      "cells": []
+    },
+    {
+      "unitId": 9999999,
+      "intervalMs": 2000,
+      "autoGenerate": true,
+      "cells": []
+    }
+  ]
+}

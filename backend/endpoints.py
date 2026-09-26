@@ -40,6 +40,15 @@ def health():
     return {"status": "ok"}
 
 
+@router.get("/vehicles/active")
+def get_active_vehicles():
+    from backend.vehicles import fleet_snapshot
+    try:
+        return fleet_snapshot()
+    except SQLAlchemyError as exc:
+        raise HTTPException(status_code=503, detail="База телеметрии недоступна") from exc
+
+
 @router.get("/predictions/latest")
 def get_latest_predictions():
     try:

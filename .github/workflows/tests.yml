@@ -31,7 +31,9 @@ jobs:
         run: python -m pip check
 
       - name: Check launch script
-        run: python -m py_compile scripts/run_demo.py
+        run: |
+          bash -n scripts/setup_and_run.sh
+          python -m compileall -q scripts ndtp_ingestion backend
 
       - name: Run tests
         run: python -m pytest -q

@@ -19,6 +19,7 @@ import argparse
 import logging
 import os
 import signal
+import threading
 import time
 from pathlib import Path
 
@@ -26,11 +27,13 @@ from ml.db import DBConfig, current_T, make_engine, run_cycle
 
 log = logging.getLogger("ml.worker")
 _stop = False
+_wake = threading.Event()
 
 
 def _handle_stop(*_):
     global _stop
     _stop = True
+    _wake.set()
 
 
 def load_predictor():
@@ -85,12 +88,12 @@ def main() -> None:
             log.error("цикл не выполнен: %s: %s — повтор через %.0f с", type(e).__name__, e, backoff)
             if args.once:
                 raise
-            time.sleep(backoff)
+            _wake.wait(backoff)
             backoff = min(backoff * 2, 60.0)
             continue
         if args.once:
             break
-        time.sleep(max(0.0, args.interval - (time.time() - t0)))
+        _wake.wait(max(0.0, args.interval - (time.time() - t0)))
 
 
 if __name__ == "__main__":
