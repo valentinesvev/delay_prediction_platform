@@ -37,3 +37,4 @@ node_modules/
 # Emulator image is kept locally
 /data/dataset/ndtp-telemetry-emulator.tar
 /data/dataset/ndtp-telemetry-emulator.tar.gz
+.venv-python39/
