@@ -23,6 +23,10 @@ flowchart TB
 ```bash
 python -m venv .venv
 source .venv/bin/activate
+# Linux: CPU-версия PyTorch без загрузки CUDA-зависимостей.
+if [ "$(uname)" = "Linux" ]; then
+  python -m pip install torch --index-url https://download.pytorch.org/whl/cpu
+fi
 python -m pip install -r requirements.txt
 mkdir -p artifacts
 python -m ml.csv_to_db --data data/dataset --url sqlite:///artifacts/demo.db
@@ -32,6 +36,7 @@ python scripts/run_demo.py
 ```
 
 На Windows активируйте виртуальное окружение своей командой, затем задайте `DATABASE_URL` и `ML_TIME_MODE` средствами вашей оболочки. Откройте `http://127.0.0.1:8000/`, API доступен в `/docs`. `ml.csv_to_db` **заменяет** таблицы `telemetry` и `schedule_plan` по переданному URL; не запускайте повторную загрузку в базу с нужной вам живой историей. Файл `artifacts/demo.db` не коммитится.
+На macOS обычная установка `requirements.txt` установит сборку PyTorch для macOS. Для первого запуска потребуются загрузка библиотек и несколько гигабайт свободного места.
 
 Для одного цикла без постоянного процесса:
 
