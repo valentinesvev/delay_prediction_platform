@@ -37,6 +37,7 @@ def main():
                         help='Порт API (по умолчанию PORT или 8000)')
     parser.add_argument('--ingestion', action='store_true', help='Запустить TCP-приёмник NDTP')
     parser.add_argument('--emulator-config', help='Запустить Docker-эмулятор с этим JSON')
+    parser.add_argument('--replay', action='store_true', help='Воспроизводить историю с управлением временем в интерфейсе')
     args = parser.parse_args()
     if not 1 <= args.port <= 65535:
         parser.error('Порт должен быть от 1 до 65535')
@@ -47,8 +48,17 @@ def main():
     from ml.db import DBConfig, _q
     from ml.results_db import initialize
     from storage.database import existing_engine
+    from storage import replay
     from sqlalchemy import text
-    cfg = DBConfig()
+    if args.replay:
+        os.environ.setdefault('REPLAY_STATE_DIR', str(ROOT / 'artifacts' / 'replay-clock'))
+        if not replay.enabled():
+            parser.error('--replay требует DATA_TIME_MODE=stream')
+    if replay.enabled() and (args.ingestion or args.emulator_config or os.name == 'nt'):
+        parser.error('Воспроизведение работает без приёмника и эмулятора; на Windows используйте Docker')
+    cfg = DBConfig(results_url=os.getenv('RESULTS_DATABASE_URL', ''))
+    if replay.enabled() and not cfg.results_url:
+        parser.error('Для воспроизведения нужен отдельный RESULTS_DATABASE_URL')
     engine = existing_engine(cfg.url, readonly=True)
     try:
         with engine.connect() as conn:
@@ -61,11 +71,11 @@ def main():
         from analytics.results import initialize as initialize_analytics
         initialize_analytics(cfg)
     commands = [
-        ['-m', 'ml.worker'],
+        ['-m', 'scripts.replay' if replay.enabled() else 'ml.worker'],
         ['-m', 'uvicorn', 'backend.api:app', '--host', '127.0.0.1',
          '--port', str(args.port)],
     ]
-    if cfg.results_url:
+    if cfg.results_url and not replay.enabled():
         commands.append(['-m', 'analytics.worker'])
     if cfg.time_mode == 'wall':
         commands.append(['-m', 'maintenance.results'])

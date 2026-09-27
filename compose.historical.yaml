@@ -23,20 +23,30 @@ services:
     environment:
       DATA_TIME_MODE: stream
       DEMO_PLAN: "0"
-  worker:
+      REPLAY_STATE_DIR: /data/runtime/replay
+    volumes:
+      - input-data:/data/input:ro
+      - runtime-config:/data/runtime
+  replay:
     extends:
       file: compose.yaml
       service: worker
+    command: ["python", "-m", "scripts.replay"]
     environment:
       DATA_TIME_MODE: stream
       DEMO_PLAN: "0"
-  analytics:
-    extends:
-      file: compose.yaml
-      service: analytics
-    environment:
-      DATA_TIME_MODE: stream
-      DEMO_PLAN: "0"
+      REPLAY_STATE_DIR: /data/runtime/replay
+      REPLAY_STEP_S: ${REPLAY_STEP_S:-10}
+      REPLAY_TICK_S: ${REPLAY_TICK_S:-1}
+      ANALYTICS_CORRIDOR_M: ${ANALYTICS_CORRIDOR_M:-150}
+      ANALYTICS_ACTIVE_S: ${ANALYTICS_ACTIVE_S:-120}
+      ANALYTICS_RECENT_S: ${ANALYTICS_RECENT_S:-600}
+      ANALYTICS_SLOWDOWN_RATIO: ${ANALYTICS_SLOWDOWN_RATIO:-1.4}
+      ANALYTICS_MIN_BASELINE_N: ${ANALYTICS_MIN_BASELINE_N:-3}
+      ANALYTICS_MIN_CONFIRMING: ${ANALYTICS_MIN_CONFIRMING:-2}
+    volumes:
+      - input-data:/data/input:ro
+      - runtime-config:/data/runtime
 
 volumes:
   input-data:

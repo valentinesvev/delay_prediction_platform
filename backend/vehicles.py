@@ -20,12 +20,20 @@ def fleet_snapshot():
     historical = cfg.time_mode == 'stream'
     result = dict(mode='historical' if historical else 'live', demo_plan=os.getenv('DEMO_PLAN') == '1',
                   reference_time=None, vehicles=[], active_window_s=120)
+    from storage import replay
+    if replay.enabled():
+        state = replay.snapshot()
+        result['replay'] = {'session': state['session'], 'status': state['status']}
     if not cfg.url:
         return result
     url = make_url(cfg.url)
     if url.get_backend_name() == 'sqlite' and url.database != ':memory:' and not Path(url.database).exists():
         return result
-    engine = make_engine(cfg)
+    if replay.enabled():
+        from storage.database import existing_engine
+        engine = existing_engine(cfg.url, readonly=True)
+    else:
+        engine = make_engine(cfg)
     try:
         with engine.connect() as conn:
             schema = inspect(conn)

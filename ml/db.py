@@ -125,6 +125,9 @@ def current_T(engine, cfg: DBConfig) -> Optional[float]:
     """Момент прогноза: последняя точка телеметрии в базе (stream) или текущее время (wall)."""
     if cfg.time_mode == "wall":
         return time.time()
+    from storage import replay
+    if replay.enabled():
+        return replay.current_time()
     from sqlalchemy import text
 
     with engine.connect() as c:

@@ -329,9 +329,9 @@
       selectAvailable();
       state.segmentIndex = null;
       const historical = data.mode === 'historical';
-      $('mode-label').textContent = historical ? 'ИСТОРИЧЕСКАЯ БАЗА' : 'ЖИВОЙ ПОТОК';
+      $('mode-label').textContent = data.replay ? 'ИСТОРИЧЕСКОЕ ВОСПРОИЗВЕДЕНИЕ' : historical ? 'ИСТОРИЧЕСКАЯ БАЗА' : 'ЖИВОЙ ПОТОК';
       $('score-source').textContent = historical ? 'СОСТОЯНИЕ НА ВРЕМЯ ТЕЛЕМЕТРИИ' : 'ТЕЛЕМЕТРИЯ · FASTAPI';
-      $('data-source').textContent = (historical ? 'Исторический режим: состояние на момент последней точки базы. ' : 'Живые данные: транспорт с достоверной точкой за последние 2 минуты. ') + (data.demo_plan ? 'ДЕМО: искусственное расписание и случайное движение эмулятора; это не проверка точности модели.' : 'Прогнозы читает API из общей базы.');
+      $('data-source').textContent = (data.replay ? 'Историческое воспроизведение: время карты, прогнозов и аналитики движется вместе. ' : historical ? 'Исторический режим: состояние на момент последней точки базы. ' : 'Живые данные: транспорт с достоверной точкой за последние 2 минуты. ') + (data.demo_plan ? 'ДЕМО: искусственное расписание и случайное движение эмулятора; это не проверка точности модели.' : 'API читает сохранённые прогнозы из базы результатов.');
       const ready = snapshot.vehicles.filter(fresh).length;
       badge.className = `server-status server-${ready ? 'ready' : 'unavailable'}`;
       badge.textContent = `FastAPI подключён · ТС: ${snapshot.vehicles.length} · свежих прогнозов: ${ready}`;

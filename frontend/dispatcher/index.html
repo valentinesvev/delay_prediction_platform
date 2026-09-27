@@ -13,6 +13,7 @@
   <script src="/dispatcher/assets/data.js" defer></script>
   <script src="/dispatcher/assets/app.js" defer></script>
   <script src="/dispatcher/assets/segments.js" defer></script>
+  <script src="/dispatcher/assets/replay.js" defer></script>
 </head>
 <body>
 <svg class="symbols" aria-hidden="true" xmlns="http://www.w3.org/2000/svg"><symbol id="bus-icon" viewBox="0 0 24 24"><rect x="5" y="3" width="14" height="17" rx="4"/><path d="M5 12h14M8 20v2m8-2v2M8 6h8"/><circle cx="8" cy="16" r=".7"/><circle cx="16" cy="16" r=".7"/></symbol></svg>
@@ -34,9 +35,19 @@
   <div class="hero-score" aria-label="Сводка"><div class="score-index">МОСКВА / 2026</div><div class="score-body"><strong id="stat-vehicles">—</strong><span>АВТОБУСОВ<br>В ЗОНЕ</span></div><div class="score-divider"></div><div class="score-body secondary"><strong id="stat-forecasts">—</strong><span>ТС<br>С ОЦЕНКОЙ</span></div><div class="score-footer" id="score-source">ОЖИДАЕМ ДАННЫЕ</div></div>
   </div>
 </section>
-<div class="record-banner"><span id="data-source">Подключаем телеметрию и прогнозы из общей базы.</span><button id="about-button" type="button">Об источниках ↗</button></div>
+<div class="record-banner"><span id="data-source">Подключаем телеметрию и прогнозы.</span><button id="about-button" type="button">Об источниках ↗</button></div>
 <div id="server-status" class="server-status" role="status" aria-live="polite">Соединяемся с FastAPI…</div>
 <main class="dashboard">
+  <section id="replay-controls" class="replay-controls" aria-label="Историческое воспроизведение" hidden>
+    <div><strong>Историческое воспроизведение</strong><p id="replay-status" role="status" aria-live="polite">Подготовка…</p></div>
+    <form id="replay-form">
+      <label for="replay-at">Начать с момента (UTC)</label>
+      <input id="replay-at" type="datetime-local" step="1" required>
+      <button type="submit">Продолжить с этого времени</button>
+      <button id="replay-beginning" type="button">С начала</button>
+    </form>
+    <small>Карта показывает московское время (UTC+3). Новый запуск пересчитает прогнозы и аналитику с выбранного момента.</small>
+  </section>
   <section class="section-heading"><div><span class="section-number">01 — ОБЗОР</span><h2>Ситуация <em>на линии</em></h2></div><div class="section-sub">Выберите автобус в списке или на карте.<br>Данные обновляются каждые 5 секунд.</div></section>
   <div class="operations-bar" aria-label="Настройки зоны и опоздания"><label>ЗОНА ОТВЕТСТВЕННОСТИ<select id="scope-select"><option value="all">Все ТС</option><option value="east">Восточная зона · GPS</option><option value="south">Южная зона · GPS</option></select></label><label>ПОРОГ ОПОЗДАНИЯ<select id="threshold-select"><option value="2">2 минуты</option><option value="5" selected>5 минут</option><option value="10">10 минут</option></select></label><span class="operations-note">Районы показаны как геофильтр. Привязка к автопарку и маршрутам появится после подключения справочников.</span></div>
   <section id="verdict-panel" class="verdict-panel" aria-label="Общий вердикт по движению" aria-live="polite"></section>
@@ -63,7 +74,7 @@
 </main>
 <footer class="playback" aria-label="Обновление данных"><div class="playback-label"><span>ДАННЫЕ ИЗ БАЗЫ</span><strong id="update-mode">Обновление каждые 5 с</strong></div><button id="refresh-button" type="button">Обновить</button><div class="playback-time"><strong id="current-time">—</strong><span id="current-date">Московское время</span></div><span id="last-update" class="step-label">Ожидаем ответ</span></footer>
 <div id="announcement" class="sr-only" aria-live="polite"></div>
-<dialog id="about-dialog"><div class="dialog-head"><h2>Источники данных</h2><button id="close-about" type="button" aria-label="Закрыть информацию">×</button></div><p>Координаты, GPS-треки и плановые остановки поступают через FastAPI из общей базы. Карта — OpenFreeMap или OpenStreetMap. Время отображается по Москве.</p><p>Текущая задержка — оценка сопоставления GPS и плана. Прогноз задержки и прибытия рассчитывает отдельный ML-воркер и сохраняет в базе. Открытие страницы не запускает модель.</p><p>Красный сигнал: текущая оценка задержки достигла порога. Жёлтый: свежий прогноз достиг порога. Это не вероятность пробки, не диагноз поломки и не подтверждение причины опоздания. Для baseline и неполной телеметрии показываются отдельные пометки.</p><p>Сплошная линия — последние 10 минут GPS с разрывами при невалидной точке или паузе более 90 секунд. Пунктир — схема между остановками, не геометрия дорог. ТС без достоверной точки за последние 2 минуты исключаются из списка после обновления.</p><p>В историческом режиме показывается состояние на момент последней точки базы. При запуске с демонстрационным планом расписание искусственное, а движение эмулятора случайное; это явно отмечается над картой.</p><button class="primary" id="understood" type="button">Понятно</button></dialog>
+<dialog id="about-dialog"><div class="dialog-head"><h2>Источники данных</h2><button id="close-about" type="button" aria-label="Закрыть информацию">×</button></div><p>Координаты, GPS-треки и плановые остановки поступают через FastAPI из общей базы. Карта — OpenFreeMap или OpenStreetMap. Время отображается по Москве.</p><p>Текущая задержка — оценка сопоставления GPS и плана. Прогноз задержки и прибытия рассчитывает отдельный ML-воркер и сохраняет в базе. Открытие страницы не запускает модель.</p><p>Красный сигнал: текущая оценка задержки достигла порога. Жёлтый: свежий прогноз достиг порога. Это не вероятность пробки, не диагноз поломки и не подтверждение причины опоздания. Для baseline и неполной телеметрии показываются отдельные пометки.</p><p>Сплошная линия — последние 10 минут GPS с разрывами при невалидной точке или паузе более 90 секунд. Пунктир — схема между остановками, не геометрия дорог. ТС без достоверной точки за последние 2 минуты исключаются из списка после обновления.</p><p>При историческом воспроизведении время карты, ML и аналитики движется вместе; можно начать сначала или выбрать момент UTC. Без воспроизведения показывается последняя точка базы. При запуске с демонстрационным планом расписание искусственное, а движение эмулятора случайное; это явно отмечается над картой.</p><button class="primary" id="understood" type="button">Понятно</button></dialog>
 <noscript>Для интерактивной карты необходимо включить JavaScript.</noscript>
 </body>
 </html>

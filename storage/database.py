@@ -13,10 +13,15 @@ def data_time_mode():
     return os.getenv('DATA_TIME_MODE') or os.getenv('ML_TIME_MODE', 'stream')
 
 
+def results_database_url():
+    from storage.replay import results_url
+    return results_url()
+
+
 @dataclass
 class DatabaseConfig:
     url: str = field(default_factory=lambda: os.getenv('DATABASE_URL', ''))
-    results_url: str = field(default_factory=lambda: os.getenv('RESULTS_DATABASE_URL', ''))
+    results_url: str = field(default_factory=results_database_url)
     pred_table: str = field(default_factory=lambda: os.getenv('ML_PREDICTIONS_TABLE', 'predictions'))
     time_mode: str = field(default_factory=data_time_mode)
 

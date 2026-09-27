@@ -79,3 +79,12 @@ dialog{border:0;border-radius:8px;max-width:560px;width:calc(100% - 32px);paddin
 @media(max-width:760px){.analytics-section{padding:15px}.analytics-controls label,.analytics-controls select{width:100%}.analytics-list{grid-template-columns:1fr}}
 @media(max-width:760px){.hero-score{column-gap:12px}.score-body,.score-body.secondary{grid-template-columns:46px minmax(0,1fr);gap:5px;min-height:0}.score-body strong,.score-body.secondary strong{font-size:39px;letter-spacing:-2px}.score-body span{font-size:8px;line-height:1.15}.score-footer{font-size:8px;line-height:1.25;letter-spacing:.2px;padding-top:6px}}
 @media(max-width:440px){.hero-score{column-gap:7px}.score-body,.score-body.secondary{grid-template-columns:42px minmax(0,1fr);gap:4px}.score-body strong,.score-body.secondary strong{font-size:36px}.score-body span{font-size:7px}}
+
+.replay-controls { margin: 0 0 28px; padding: 20px; border: 1px solid #d7d9d8; background: #f4f6f5; }
+.replay-controls[hidden] { display: none; }
+.replay-controls p { margin: 8px 0 14px; }
+.replay-controls form { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; }
+.replay-controls input, .replay-controls button { padding: 10px 12px; font: inherit; border: 1px solid #bac2bf; background: white; color: #263d36; }
+.replay-controls button { cursor: pointer; }
+.replay-controls button:disabled { opacity: .5; cursor: wait; }
+.replay-controls small { display: block; margin-top: 12px; }

@@ -45,4 +45,5 @@ jobs:
       - name: Check dispatcher scripts
         run: |
           node --check frontend/dispatcher/assets/app.js
-          node --test tests/dispatcher-data.test.cjs tests/dispatcher-ui.test.cjs
+          node --check frontend/dispatcher/assets/replay.js
+          node --test tests/dispatcher-data.test.cjs tests/dispatcher-ui.test.cjs tests/replay-ui.test.cjs

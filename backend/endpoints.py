@@ -27,7 +27,9 @@ def _present(row):
     max_age = float(os.getenv("PREDICTION_MAX_AGE_SECONDS", "90"))
     if max_age <= 0:
         raise ValueError("PREDICTION_MAX_AGE_SECONDS должен быть положительным")
-    age = time.time() - min(forecast_at.timestamp(), predicted_at.timestamp())
+    from storage import replay
+    reference = replay.current_time() if replay.enabled() else time.time()
+    age = reference - min(forecast_at.timestamp(), predicted_at.timestamp())
     result["status"] = "stale" if age > max_age else "ready"
     for key in ("t_forecast", "predicted_at", "target_time_plan", "predicted_arrival"):
         result[key] = _timestamp(result[key]).isoformat()

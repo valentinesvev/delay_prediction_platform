@@ -26,7 +26,8 @@ def _quote(name):
 
 
 def _read(sql, params=None):
-    explicit = os.getenv("RESULTS_DATABASE_URL")
+    from storage.database import results_database_url
+    explicit = results_database_url()
     url = explicit or os.getenv("DATABASE_URL")
     if not url:
         return []
@@ -48,17 +49,28 @@ def _read(sql, params=None):
 
 def latest_for_all():
     columns = ", ".join(_quote(c) for c in COLUMNS)
+    condition, params = _replay_cutoff()
     return _read(f"""
         SELECT {columns} FROM (
             SELECT {columns}, ROW_NUMBER() OVER (
                 PARTITION BY tr_id ORDER BY t_forecast DESC, id DESC
-            ) AS row_number FROM {{table}}
+            ) AS row_number FROM {{table}} {condition}
         ) AS ranked WHERE row_number = 1 ORDER BY tr_id
-    """)
+    """, params)
 
 
 def latest_for_vehicle(tr_id):
     columns = ", ".join(_quote(c) for c in COLUMNS)
+    condition, params = _replay_cutoff()
+    extra = condition.replace('WHERE', 'AND', 1) if condition else ''
     rows = _read(f"SELECT {columns} FROM {{table}} WHERE tr_id = :tr_id "
-                 "ORDER BY t_forecast DESC, id DESC LIMIT 1", {"tr_id": tr_id})
+                 f"{extra} ORDER BY t_forecast DESC, id DESC LIMIT 1", {"tr_id": tr_id, **params})
     return rows[0] if rows else None
+
+
+def _replay_cutoff():
+    from storage import replay
+    from storage.database import utc_datetime
+    if not replay.enabled():
+        return '', {}
+    return 'WHERE t_forecast <= :replay_time', {'replay_time': utc_datetime(replay.current_time()).strftime('%Y-%m-%d %H:%M:%S.%f')}

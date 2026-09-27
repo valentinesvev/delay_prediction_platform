@@ -10,7 +10,8 @@ from sqlalchemy import func, inspect, select
 from sqlalchemy.exc import SQLAlchemyError
 
 from analytics.results import alerts, segment_state
-from storage.database import existing_engine
+from storage.database import existing_engine, results_database_url, utc_datetime
+from storage import replay
 
 
 router = APIRouter(prefix="/analytics", tags=["segment analytics"])
@@ -25,7 +26,7 @@ def _serialize(row):
 
 
 def _read(table, statement):
-    url = os.getenv("RESULTS_DATABASE_URL")
+    url = results_database_url()
     if not url:
         raise HTTPException(503, "База результатов не настроена")
     try:
@@ -43,9 +44,10 @@ def _read(table, statement):
 
 @router.get("/segments")
 def latest_segments():
-    latest = (select(segment_state.c.segment_id,
-                     func.max(segment_state.c.calculated_at).label("latest_at"))
-              .group_by(segment_state.c.segment_id).subquery())
+    latest_query = select(segment_state.c.segment_id, func.max(segment_state.c.calculated_at).label('latest_at'))
+    if replay.enabled():
+        latest_query = latest_query.where(segment_state.c.calculated_at <= utc_datetime(replay.current_time()))
+    latest = latest_query.group_by(segment_state.c.segment_id).subquery()
     statement = (select(segment_state)
                  .join(latest, (segment_state.c.segment_id == latest.c.segment_id)
                        & (segment_state.c.calculated_at == latest.c.latest_at))
@@ -57,6 +59,8 @@ def latest_segments():
 
 @router.get("/alerts")
 def active_alerts():
-    rows = _read(alerts, select(alerts).where(alerts.c.status == "ACTIVE")
-                 .order_by(alerts.c.updated_at.desc()))
+    statement = select(alerts).where(alerts.c.status == 'ACTIVE')
+    if replay.enabled():
+        statement = statement.where(alerts.c.updated_at <= utc_datetime(replay.current_time()))
+    rows = _read(alerts, statement.order_by(alerts.c.updated_at.desc()))
     return {"status": "ready" if rows else "empty", "alerts": rows}
